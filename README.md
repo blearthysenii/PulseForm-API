@@ -1,8 +1,10 @@
+mos shkruaj kush me qka u merr sepse te gjith:
+
 # PulseForm API
 
 Backend service for **PulseForm** — a survey & feedback platform. A simplified version of tools like Google Forms, Typeform, or SurveyMonkey: someone builds a survey, shares a link, people answer, and the results come back as live, readable summaries.
 
-This repository contains the REST API built with **Python & FastAPI**. The frontend lives in a separate repo: [`PulseForm-Web`](../PulseForm-Web).
+This repository contains the REST API built with **Python & FastAPI**. The frontend lives in a separate repo: [`PulseForm-Web`](https://github.com/blearthysenii/PulseForm-Web).
 
 ---
 
@@ -17,14 +19,14 @@ The API powers the full product loop: **Build → Share → Collect → Analyze.
 
 ## 🧩 Core features
 
-| Feature | Description |
-|---|---|
-| **Auth & user roles** | Creators and admins sign in (JWT). Respondents can answer without an account. |
-| **Survey builder** | Create a survey with title & description; add, edit, reorder, and remove questions. |
-| **Question types** | At least three: multiple choice (single or multi pick), rating scale, free text. |
-| **CSV import** | Upload a CSV file to create many questions at once. |
-| **Publishing & sharing** | Publish a survey to get a shareable link; open/close it to new responses. |
-| **Collecting responses** | Each submission is stored as a single response tied to its survey. Required questions are validated before accepting. |
+| Feature                    | Description                                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth & user roles**      | Creators and admins sign in (JWT). Respondents can answer without an account.                                                             |
+| **Survey builder**         | Create a survey with title & description; add, edit, reorder, and remove questions.                                                       |
+| **Question types**         | At least three: multiple choice (single or multi pick), rating scale, free text.                                                          |
+| **CSV import**             | Upload a CSV file to create many questions at once.                                                                                       |
+| **Publishing & sharing**   | Publish a survey to get a shareable link; open/close it to new responses.                                                                 |
+| **Collecting responses**   | Each submission is stored as a single response tied to its survey. Required questions are validated before accepting.                     |
 | **Results dashboard data** | Aggregated stats per question: counts for choices, distributions for scales, response totals, and free-text answers gathered for reading. |
 
 ## 👤 Roles
@@ -41,7 +43,8 @@ The API powers the full product loop: **Build → Share → Collect → Analyze.
 - **FastAPI** — web framework
 - **SQLAlchemy** — ORM
 - **Pydantic** — request/response validation
-- **PostgreSQL** (production) / **SQLite** (local development)
+- **MySQL** — relational database
+- **PyMySQL** — MySQL database driver
 - **JWT** (`python-jose`) + `passlib[bcrypt]` — authentication
 - **Alembic** — database migrations
 - **pytest** — testing
@@ -73,7 +76,7 @@ PulseForm-API/
 ### 1. Clone & create a virtual environment
 
 ```bash
-git clone https://github.com/<your-username>/PulseForm-API.git
+git git clone https://github.com/blearthysenii/PulseForm-API.git
 cd PulseForm-API
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
@@ -87,12 +90,20 @@ pip install -r requirements.txt
 
 ### 3. Configure environment
 
+Linux / Mac
+
 ```bash
 cp .env.example .env
 ```
 
+Windows
+
+```bash
+copy .env.example .env
+```
+
 ```env
-DATABASE_URL=sqlite:///./pulseform.db   # or postgresql://user:pass@localhost/pulseform
+DATABASE_URL=mysql+pymysql://root:password@localhost/pulseform
 SECRET_KEY=change-me
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 CORS_ORIGINS=http://localhost:5173
@@ -110,23 +121,36 @@ Interactive docs: **Swagger UI** at `http://localhost:8000/docs`.
 
 ## 📡 API overview
 
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| `POST` | `/auth/register` | Create an account | — |
-| `POST` | `/auth/login` | Get a JWT token | — |
-| `GET` | `/surveys` | List my surveys | Creator |
-| `POST` | `/surveys` | Create a survey | Creator |
-| `PUT` | `/surveys/{id}` | Edit survey & questions | Creator |
-| `POST` | `/surveys/{id}/questions/import` | Import questions from CSV | Creator |
-| `POST` | `/surveys/{id}/publish` | Publish / get share link | Creator |
-| `PATCH` | `/surveys/{id}/status` | Open / close responses | Creator |
-| `GET` | `/s/{share_token}` | Public survey view | — |
-| `POST` | `/s/{share_token}/responses` | Submit a response | — |
-| `GET` | `/surveys/{id}/results` | Aggregated results | Creator |
+| Method  | Endpoint                         | Description               | Auth    |
+| ------- | -------------------------------- | ------------------------- | ------- |
+| `POST`  | `/auth/register`                 | Create an account         | —       |
+| `POST`  | `/auth/login`                    | Get a JWT token           | —       |
+| `GET`   | `/surveys`                       | List my surveys           | Creator |
+| `POST`  | `/surveys`                       | Create a survey           | Creator |
+| `PUT`   | `/surveys/{id}`                  | Edit survey & questions   | Creator |
+| `POST`  | `/surveys/{id}/questions/import` | Import questions from CSV | Creator |
+| `POST`  | `/surveys/{id}/publish`          | Publish / get share link  | Creator |
+| `PATCH` | `/surveys/{id}/status`           | Open / close responses    | Creator |
+| `GET`   | `/s/{share_token}`               | Public survey view        | —       |
+| `POST`  | `/s/{share_token}/responses`     | Submit a response         | —       |
+| `GET`   | `/surveys/{id}/results`          | Aggregated results        | Creator |
 
 ## 🗃 Data modeling note
 
 A key design challenge of this project: **different question types have different answer shapes** — a chosen option, a number, or a block of text. The `Answer` model stores all of them in one consistent structure (e.g. nullable columns per shape, or a JSON value column) so every question type fits the same pipeline. Deciding and defending this design is part of the capstone.
+
+## 👥 Team
+
+- Bleart Hyseni
+- Abit Hyseni
+- Flamur Avdylaj
+- Elijon Rexhepi
+
+## 🎓 Mentor
+
+- Labinot Jaha
+
+Project developed as part of the Intern Capstone Project.
 
 ## 🧪 Tests
 
@@ -136,4 +160,4 @@ pytest
 
 ## 🔗 Related
 
-- Frontend: [`PulseForm-Web`](https://github.com/<your-username>/PulseForm-Web)
+- Frontend: [`PulseForm-Web`](https://github.com/blearthysenii/PulseForm-Web)

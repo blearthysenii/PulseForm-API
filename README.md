@@ -74,7 +74,7 @@ PulseForm-API/
 ### 1. Clone & create a virtual environment
 
 ```bash
-git git clone https://github.com/blearthysenii/PulseForm-API.git
+git clone https://github.com/blearthysenii/PulseForm-API.git
 cd PulseForm-API
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate

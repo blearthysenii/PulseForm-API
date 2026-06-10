@@ -139,8 +139,6 @@ A key design challenge of this project: **different question types have differen
 
 ## 👥 Team
 
-## 👥 Team
-
 - [Abit Hyseni](https://github.com/biti222)
 - [Flamur Avdylaj](https://github.com/avdylaj-flamur)
 - [Bleart Hyseni](https://github.com/blearthysenii)

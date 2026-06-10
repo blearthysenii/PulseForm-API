@@ -1,5 +1,3 @@
-mos shkruaj kush me qka u merr sepse te gjith:
-
 # PulseForm API
 
 Backend service for **PulseForm** — a survey & feedback platform. A simplified version of tools like Google Forms, Typeform, or SurveyMonkey: someone builds a survey, shares a link, people answer, and the results come back as live, readable summaries.

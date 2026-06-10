@@ -51,7 +51,7 @@ The API powers the full product loop: **Build → Share → Collect → Analyze.
 
 ```
 PulseForm-API/
-├── app/
+├── api/
 │   ├── main.py              # FastAPI app entrypoint
 │   ├── core/                # config, security (JWT, hashing)
 │   ├── models/              # SQLAlchemy models (User, Survey, Question, Response, Answer)

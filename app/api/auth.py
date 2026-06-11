@@ -1,15 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserRegister, UserResponse, TokenResponse
-from app.core.security import hash_password, verify_password, create_access_token, decode_token
+from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
+from app.core.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    decode_token
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+bearer_scheme = HTTPBearer()
 
 
 @router.post("/register", response_model=UserResponse)
@@ -37,13 +42,10 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    user = db.query(User).filter(User.email == form_data.username).first()
+def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == user_data.email).first()
 
-    if not user or not verify_password(form_data.password, user.password_hash):
+    if not user or not verify_password(user_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
@@ -62,9 +64,10 @@ def login(
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db)
 ):
+    token = credentials.credentials
     payload = decode_token(token)
 
     if not payload:
@@ -74,6 +77,12 @@ def get_current_user(
         )
 
     user_id = payload.get("sub")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
 
     user = db.query(User).filter(User.id == int(user_id)).first()
 

@@ -36,11 +36,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/")
 def root():
     return {"message": "PulseForm API is running"}
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
+@app.get("/db-test")
+def db_test():
+    try:
+        conn = engine.connect()
+        conn.close()
+        return {"db": "connected"}
+    except Exception as e:
+        return {"db": "failed", "error": str(e)}
 
 app.include_router(auth_router)

@@ -41,8 +41,8 @@ The API powers the full product loop: **Build → Share → Collect → Analyze.
 - **FastAPI** — web framework
 - **SQLAlchemy** — ORM
 - **Pydantic** — request/response validation
-- **MySQL** — relational database
-- **PyMySQL** — MySQL database driver
+- **PostgreSQL (Neon)** — relational database
+- **psycopg2-binary** — PostgreSQL database driver
 - **JWT** (`python-jose`) + `passlib[bcrypt]` — authentication
 - **Alembic** — database migrations
 - **pytest** — testing
@@ -101,7 +101,7 @@ copy .env.example .env
 ```
 
 ```env
-DATABASE_URL=mysql+pymysql://root:password@localhost/pulseform
+DATABASE_URL=postgresql://username:password@host/database?sslmode=require
 SECRET_KEY=change-me
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 CORS_ORIGINS=http://localhost:5173

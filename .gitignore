@@ -1,11 +1,14 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
 # Virtual Environment
 venv/
+.venv/
+env/
+
+# Environment variables
 .env
 .env.local
 
@@ -15,12 +18,35 @@ venv/
 
 # Database
 *.db
+*.sqlite3
 
 # Logs
 *.log
 
-# Pytest
+# Testing
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+dist/
 
 # Alembic
 alembic/versions/__pycache__/
+
+# Python package metadata
+*.egg-info/
+
+# VSCode settings
+.history/
+
+# Local uploads (if you create one later)
+uploads/

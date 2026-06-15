@@ -5,6 +5,7 @@ class UserRegister(BaseModel):
     full_name: str
     email: EmailStr
     password: str
+    organization: str | None = None
 
 
 class UserLogin(BaseModel):
@@ -15,8 +16,9 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: int
     full_name: str
-    email: str
+    email: EmailStr
     role: str
+    organization: str | None = None
 
     class Config:
         from_attributes = True

@@ -18,7 +18,16 @@ PASSWORD_RESET_EXPIRE_MINUTES = int(os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", 3
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def validate_bcrypt_password(password: str):
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password must be 72 characters or less")
+
+
 def hash_password(password: str):
+    validate_bcrypt_password(password)
     return pwd_context.hash(password)
 
 

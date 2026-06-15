@@ -22,3 +22,7 @@ class SurveyUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     is_published: Optional[bool] = None
+
+class SurveyCreate(BaseModel):
+    title: str
+    description: Optional[str] = None

@@ -16,8 +16,9 @@ load_dotenv()
 from app.models.user import User
 from app.models.survey import Survey
 from app.models.question import Question
-from app.models.question_option import QuestionOption
 from app.models.response import Response
+from app.api.survey import router as survey_router
+from app.models.question_option import QuestionOption
 from app.models.answer import Answer
 
 
@@ -45,6 +46,8 @@ Base.metadata.create_all(bind=engine)
 def root():
     return {"message": "PulseForm API is running"}
 
+app.include_router(survey_router)
+app.include_router(auth_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -57,5 +60,3 @@ def db_test():
         return {"db": "connected"}
     except Exception as e:
         return {"db": "failed", "error": str(e)}
-
-app.include_router(auth_router)

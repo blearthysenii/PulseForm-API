@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -12,3 +13,5 @@ class Question(Base):
     type = Column(String(50), nullable=False)  # mcq | rating | text
     is_required = Column(Boolean, default=False)
     position = Column(Integer, default=0)
+
+    survey = relationship("Survey", back_populates="questions")

@@ -187,16 +187,11 @@ def forgot_password(
 ):
     user = db.query(User).filter(User.email == data.email).first()
 
-    if user:
-        if user.auth_provider != "local":
-            return {"message": "If that email is registered, a reset code has been sent."}
-
+    if user and user.auth_provider == "local":
         reset_code, expires = generate_reset_code()
-
         user.password_reset_token = reset_code
         user.password_reset_expires = expires
         db.commit()
-
         background_tasks.add_task(send_reset_email, user.email, reset_code)
 
     return {"message": "If that email is registered, a reset code has been sent."}

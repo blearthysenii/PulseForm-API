@@ -3,9 +3,13 @@ from app.database import engine
 
 app = FastAPI()
 
+Base.metadata.create_all(bind=engine)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.get("/db-test")
 def db_test():

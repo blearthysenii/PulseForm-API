@@ -10,7 +10,6 @@ from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
@@ -25,6 +24,8 @@ from app.core.security import (
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer_scheme = HTTPBearer()
+
+MAX_BCRYPT_PASSWORD_BYTES = 72
 
 
 class GoogleLoginRequest(BaseModel):
@@ -60,6 +61,20 @@ class ResetPasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+def validate_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 8 characters"
+        )
+
+    if len(password.encode("utf-8")) > MAX_BCRYPT_PASSWORD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be 72 characters or less"
+        )
 
 
 def create_user_token(user: User) -> dict:
@@ -148,6 +163,8 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
 
+    validate_password(user_data.password)
+
     new_user = User(
         full_name=user_data.full_name,
         email=user_data.email,
@@ -229,11 +246,7 @@ def complete_google_register(
     if existing_user:
         return create_user_token(existing_user)
 
-    if len(data.password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 8 characters"
-        )
+    validate_password(data.password)
 
     if data.password != data.confirm_password:
         raise HTTPException(
@@ -282,11 +295,7 @@ def forgot_password(
 
 @router.post("/reset-password", response_model=MessageResponse)
 def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
-    if len(data.new_password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 8 characters"
-        )
+    validate_password(data.new_password)
 
     if data.new_password != data.confirm_password:
         raise HTTPException(
@@ -351,4 +360,3 @@ def get_current_user(
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
-

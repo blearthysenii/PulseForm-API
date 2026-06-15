@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
 from app.database import Base
 
 
@@ -11,3 +11,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=True)
     role = Column(String(50), default="creator")
     auth_provider = Column(String(50), default="local")
+
+    # Password reset
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)

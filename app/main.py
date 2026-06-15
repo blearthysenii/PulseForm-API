@@ -15,7 +15,6 @@ from app.models.question import Question
 from app.models.response import Response
 from app.api.survey import router as survey_router
 from app.models.question_option import QuestionOption
-from app.models.response import Response
 from app.models.answer import Answer
 
 load_dotenv()
@@ -56,5 +55,3 @@ def db_test():
         return {"db": "connected"}
     except Exception as e:
         return {"db": "failed", "error": str(e)}
-
-app.include_router(auth_router)

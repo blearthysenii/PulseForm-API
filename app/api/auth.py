@@ -1,19 +1,16 @@
 import os
 import smtplib
 from email.mime.text import MIMEText
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from app.core.dependencies import get_current_user, require_roles
-from app.database import get_db
-from app.models.user import User
-from app.schemas.user import UserRegister, UserResponse, TokenResponse
-from app.core.security import hash_password, verify_password, create_access_token
 from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
+from app.core.dependencies import require_roles
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
@@ -27,12 +24,28 @@ from app.core.security import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-
 bearer_scheme = HTTPBearer()
 
 
 class GoogleLoginRequest(BaseModel):
     credential: str
+
+
+class GoogleLoginResponse(BaseModel):
+    access_token: Optional[str] = None
+    token_type: Optional[str] = None
+    needs_registration: bool = False
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    google_registration_token: Optional[str] = None
+
+
+class CompleteGoogleRegisterRequest(BaseModel):
+    google_registration_token: str
+    full_name: str
+    organization: Optional[str] = None
+    password: str
+    confirm_password: str
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -47,6 +60,42 @@ class ResetPasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+def create_user_token(user: User) -> dict:
+    token = create_access_token({
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role
+    })
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
+
+def verify_google_credential(credential: str) -> dict:
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+
+    if not google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GOOGLE_CLIENT_ID is not configured"
+        )
+
+    try:
+        return id_token.verify_oauth2_token(
+            credential,
+            requests.Request(),
+            google_client_id,
+            clock_skew_in_seconds=30
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        )
 
 
 def send_reset_email(email: str, code: str):
@@ -106,7 +155,7 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         role="creator",
         auth_provider="local",
         organization=user_data.organization
-)
+    )
 
     db.add(new_user)
     db.commit()
@@ -125,34 +174,12 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
 
-    token = create_access_token({
-        "sub": str(user.id),
-        "email": user.email,
-        "role": user.role
-    })
-
-    return {"access_token": token, "token_type": "bearer"}
+    return create_user_token(user)
 
 
-@router.post("/google-login", response_model=TokenResponse)
+@router.post("/google-login", response_model=GoogleLoginResponse)
 def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
-    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
-
-    if not google_client_id:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="GOOGLE_CLIENT_ID is not configured"
-        )
-
-    try:
-        google_user = id_token.verify_oauth2_token(
-            data.credential,
-            requests.Request(),
-            google_client_id,
-            clock_skew_in_seconds=30
-        )
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    google_user = verify_google_credential(data.credential)
 
     email = google_user.get("email")
     full_name = google_user.get("name")
@@ -165,25 +192,69 @@ def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.email == email).first()
 
-    if not user:
-        user = User(
-            full_name=full_name or email,
-            email=email,
-            password_hash=None,
-            role="creator",
-            auth_provider="google"
+    if user:
+        token_data = create_user_token(user)
+
+        return {
+            "access_token": token_data["access_token"],
+            "token_type": token_data["token_type"],
+            "needs_registration": False
+        }
+
+    return {
+        "needs_registration": True,
+        "email": email,
+        "full_name": full_name or email,
+        "google_registration_token": data.credential
+    }
+
+
+@router.post("/complete-google-register", response_model=TokenResponse)
+def complete_google_register(
+    data: CompleteGoogleRegisterRequest,
+    db: Session = Depends(get_db)
+):
+    google_user = verify_google_credential(data.google_registration_token)
+
+    email = google_user.get("email")
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google account email not found"
         )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
 
-    token = create_access_token({
-        "sub": str(user.id),
-        "email": user.email,
-        "role": user.role
-    })
+    existing_user = db.query(User).filter(User.email == email).first()
 
-    return {"access_token": token, "token_type": "bearer"}
+    if existing_user:
+        return create_user_token(existing_user)
+
+    if len(data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 8 characters"
+        )
+
+    if data.password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match"
+        )
+
+    new_user = User(
+        full_name=data.full_name,
+        email=email,
+        password_hash=hash_password(data.password),
+        role="creator",
+        auth_provider="google",
+        organization=data.organization
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return create_user_token(new_user)
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
@@ -216,11 +287,12 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Password must be at least 8 characters"
         )
+
     if data.new_password != data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Passwords do not match"
-    )
+        )
 
     user = db.query(User).filter(
         User.password_reset_token == data.code
@@ -244,7 +316,7 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     return {"message": "Password updated successfully. You can now log in."}
 
 
-def get_current_user(
+def get_current_user_local(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ):
@@ -277,10 +349,10 @@ def get_current_user(
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user_local)):
     return current_user
 
 
 @router.get("/creator-only")
 def creator_only(user=Depends(require_roles(["creator"]))):
-    return {"message": "You are creator "}
+    return {"message": "You are creator"}

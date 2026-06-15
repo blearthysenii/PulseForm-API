@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-from app.core.dependencies import require_roles
+
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
@@ -352,7 +352,3 @@ def get_current_user_local(
 def get_me(current_user: User = Depends(get_current_user_local)):
     return current_user
 
-
-@router.get("/creator-only")
-def creator_only(user=Depends(require_roles(["creator"]))):
-    return {"message": "You are creator"}

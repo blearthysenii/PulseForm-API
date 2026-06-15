@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.database.db import engine
+from app.database import engine
 
 app = FastAPI()
 
@@ -29,6 +29,8 @@ from app.api.auth import router as auth_router
 from app.models.user import User
 from app.models.survey import Survey
 from app.models.question import Question
+from app.models.response import Response
+from app.api.survey import router as survey_router
 from app.models.question_option import QuestionOption
 from app.models.response import Response
 from app.models.answer import Answer
@@ -57,6 +59,8 @@ app.add_middleware(
 def root():
     return {"message": "PulseForm API is running"}
 
+app.include_router(survey_router)
+app.include_router(auth_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}

@@ -316,7 +316,7 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
     return {"message": "Password updated successfully. You can now log in."}
 
 
-def get_current_user_local(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ):
@@ -349,6 +349,6 @@ def get_current_user_local(
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user_local)):
+def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 

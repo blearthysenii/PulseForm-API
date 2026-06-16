@@ -52,3 +52,19 @@ def delete_survey(db: Session, survey_id: int, creator_id: int):
     db.delete(survey)
     db.commit()
     return {"message": "Survey deleted successfully"}
+
+
+def publish_survey(db: Session, survey_id: int, creator_id: int):
+    survey = get_survey(db, survey_id, creator_id)
+    survey.is_published = True
+    db.commit()
+    db.refresh(survey)
+    return survey
+
+
+def unpublish_survey(db: Session, survey_id: int, creator_id: int):
+    survey = get_survey(db, survey_id, creator_id)
+    survey.is_published = False
+    db.commit()
+    db.refresh(survey)
+    return survey

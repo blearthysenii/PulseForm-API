@@ -29,7 +29,6 @@ class Survey(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    user_id = Column("creator_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     is_published = Column(Boolean, default=False)
     allow_multiple_responses = Column(Boolean, default=False)
     share_token = Column(String(255), unique=True, nullable=True)

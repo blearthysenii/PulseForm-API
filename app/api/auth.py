@@ -261,45 +261,29 @@ def forgot_password(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    print("========== FORGOT PASSWORD ==========")
+    print("Email:", data.email)
+
     user = db.query(User).filter(User.email == data.email).first()
 
-    if user and user.password_hash:
+    print("User:", user)
+
+    if user:
+        print("Auth provider:", user.auth_provider)
+        print("Password hash exists:", bool(user.password_hash))
+
         reset_code, expires = generate_reset_code()
         user.password_reset_token = reset_code
         user.password_reset_expires = expires
         db.commit()
+
+        print("Reset code:", reset_code)
+
         background_tasks.add_task(send_reset_email, user.email, reset_code)
+    else:
+        print("USER NOT FOUND")
 
     return {"message": "If that email is registered, a reset code has been sent."}
-
-
-@router.post("/reset-password", response_model=MessageResponse)
-def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
-    validate_password(data.new_password)
-
-    if data.new_password != data.confirm_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Passwords do not match"
-        )
-
-    user = db.query(User).filter(User.password_reset_token == data.code).first()
-
-    if not user or not is_reset_code_valid(
-        user.password_reset_token,
-        user.password_reset_expires,
-        data.code,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired reset code",
-        )
-
-    user.password_hash = hash_password(data.new_password)
-    user.password_reset_token = None
-    user.password_reset_expires = None
-    db.commit()
-
-    return {"message": "Password updated successfully. You can now log in."}
 
 
 def get_current_user(

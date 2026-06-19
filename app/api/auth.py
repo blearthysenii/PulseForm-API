@@ -1,16 +1,13 @@
 import os
-import smtplib
-from email.mime.text import MIMEText
 from typing import Optional
 import resend
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
-
 
 from app.database import get_db
 from app.models.user import User
@@ -98,20 +95,27 @@ def verify_google_credential(credential: str) -> dict:
 
     try:
         return id_token.verify_oauth2_token(
-            credential, requests.Request(), google_client_id, clock_skew_in_seconds=30
+            credential,
+            requests.Request(),
+            google_client_id,
+            clock_skew_in_seconds=30,
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
 def send_reset_email(email: str, code: str):
+    print("========== SEND RESET EMAIL CALLED ==========")
+    print("Sending to:", email)
+
     resend.api_key = os.getenv("RESEND_API_KEY")
 
     if not resend.api_key:
         print("[EMAIL ERROR] RESEND_API_KEY is not configured")
-        return
+        return False
 
     email_from = os.getenv("EMAIL_FROM", "PulseForm <onboarding@resend.dev>")
+    print("Email from:", email_from)
 
     try:
         response = resend.Emails.send(
@@ -128,14 +132,16 @@ def send_reset_email(email: str, code: str):
                 <p>If you did not request this, please ignore this email.</p>
                 <br />
                 <p>PulseForm Team</p>
-            """,
+                """,
             }
         )
 
         print(f"[EMAIL SENT] Resend email sent to {email}: {response}")
+        return True
 
     except Exception as e:
         print(f"[EMAIL ERROR] {type(e).__name__}: {e}")
+        return False
 
 
 @router.post("/register", response_model=UserResponse)
@@ -144,7 +150,8 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
 
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
         )
 
     validate_password(user_data.password)
@@ -175,7 +182,8 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         or not verify_password(user_data.password, user.password_hash)
     ):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
         )
 
     return create_user_token(user)
@@ -215,7 +223,8 @@ def google_login(data: GoogleLoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/complete-google-register", response_model=TokenResponse)
 def complete_google_register(
-    data: CompleteGoogleRegisterRequest, db: Session = Depends(get_db)
+    data: CompleteGoogleRegisterRequest,
+    db: Session = Depends(get_db),
 ):
     google_user = verify_google_credential(data.google_registration_token)
 
@@ -236,7 +245,8 @@ def complete_google_register(
 
     if data.password != data.confirm_password:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Passwords do not match"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match",
         )
 
     new_user = User(
@@ -258,17 +268,15 @@ def complete_google_register(
 @router.post("/forgot-password", response_model=MessageResponse)
 def forgot_password(
     data: ForgotPasswordRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     print("========== FORGOT PASSWORD ==========")
     print("Email:", data.email)
 
     user = db.query(User).filter(User.email == data.email).first()
-
     print("User:", user)
 
-    if user:
+    if user and user.password_hash:
         print("Auth provider:", user.auth_provider)
         print("Password hash exists:", bool(user.password_hash))
 
@@ -278,12 +286,44 @@ def forgot_password(
         db.commit()
 
         print("Reset code:", reset_code)
+        print("About to call send_reset_email")
 
-        background_tasks.add_task(send_reset_email, user.email, reset_code)
+        send_reset_email(user.email, reset_code)
+
     else:
-        print("USER NOT FOUND")
+        print("USER NOT FOUND OR PASSWORD HASH MISSING")
 
     return {"message": "If that email is registered, a reset code has been sent."}
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    validate_password(data.new_password)
+
+    if data.new_password != data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match",
+        )
+
+    user = db.query(User).filter(User.password_reset_token == data.code).first()
+
+    if not user or not is_reset_code_valid(
+        user.password_reset_token,
+        user.password_reset_expires,
+        data.code,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset code",
+        )
+
+    user.password_hash = hash_password(data.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.commit()
+
+    return {"message": "Password updated successfully. You can now log in."}
 
 
 def get_current_user(
@@ -295,21 +335,24 @@ def get_current_user(
 
     if not payload:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
         )
 
     user_id = payload.get("sub")
 
     if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
         )
 
     user = db.query(User).filter(User.id == int(user_id)).first()
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
         )
 
     return user

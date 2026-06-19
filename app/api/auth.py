@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
+import traceback
 
 from app.database import get_db
 from app.models.user import User
@@ -144,8 +145,8 @@ PulseForm Team
 
         print(f"[EMAIL SENT] Password reset code sent to {email}")
 
-    except Exception as e:
-        print(f"[EMAIL ERROR] {type(e).__name__}: {e}")
+    except Exception:
+        traceback.print_exc()
 
 
 @router.post("/register", response_model=UserResponse)

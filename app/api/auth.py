@@ -263,7 +263,7 @@ def forgot_password(
 ):
     user = db.query(User).filter(User.email == data.email).first()
 
-    if user and user.auth_provider == "local":
+    if user and user.password_hash:
         reset_code, expires = generate_reset_code()
         user.password_reset_token = reset_code
         user.password_reset_expires = expires

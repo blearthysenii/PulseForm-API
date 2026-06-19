@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from typing import Optional
+import resend
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -9,8 +10,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
-import traceback
-import socket
+
 
 from app.database import get_db
 from app.models.user import User
@@ -104,59 +104,38 @@ def verify_google_credential(credential: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
-@router.get("/smtp-test")
-def smtp_test():
-    try:
-        socket.create_connection(("smtp.gmail.com", 465), 10)
-        return {"status": "connected"}
-    except Exception as e:
-        return {"status": "failed", "error": str(e), "type": type(e).__name__}
-
-
 def send_reset_email(email: str, code: str):
-    subject = "PulseForm Password Reset Code"
+    resend.api_key = os.getenv("RESEND_API_KEY")
 
-    body = f"""
-Hello,
+    if not resend.api_key:
+        print("[EMAIL ERROR] RESEND_API_KEY is not configured")
+        return
 
-You requested a password reset for your PulseForm account.
-
-Your password reset code is:
-
-{code}
-
-This code will expire soon. If you did not request this password reset, please ignore this email.
-
-PulseForm Team
-"""
-
-    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = smtp_user
-    msg["To"] = email
+    email_from = os.getenv("EMAIL_FROM", "PulseForm <onboarding@resend.dev>")
 
     try:
-        if smtp_port == 465:
-            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30) as server:
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
-        else:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
+        response = resend.Emails.send(
+            {
+                "from": email_from,
+                "to": [email],
+                "subject": "PulseForm Password Reset Code",
+                "html": f"""
+                <h2>PulseForm Password Reset</h2>
+                <p>You requested a password reset for your PulseForm account.</p>
+                <p>Your reset code is:</p>
+                <h1 style="letter-spacing: 4px;">{code}</h1>
+                <p>This code will expire soon.</p>
+                <p>If you did not request this, please ignore this email.</p>
+                <br />
+                <p>PulseForm Team</p>
+            """,
+            }
+        )
 
-        print(f"[EMAIL SENT] Password reset code sent to {email}")
+        print(f"[EMAIL SENT] Resend email sent to {email}: {response}")
 
-    except Exception:
-        traceback.print_exc()
+    except Exception as e:
+        print(f"[EMAIL ERROR] {type(e).__name__}: {e}")
 
 
 @router.post("/register", response_model=UserResponse)

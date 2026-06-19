@@ -1,25 +1,25 @@
 import os
 from typing import Optional
-import resend
 
+import resend
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
-from google.oauth2 import id_token
 from google.auth.transport import requests
+from google.oauth2 import id_token
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.user import User
-from app.schemas.user import UserRegister, UserLogin, UserResponse, TokenResponse
 from app.core.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     decode_token,
     generate_reset_code,
+    hash_password,
     is_reset_code_valid,
+    verify_password,
 )
+from app.database import get_db
+from app.models.user import User
+from app.schemas.user import TokenResponse, UserLogin, UserRegister, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 bearer_scheme = HTTPBearer()
@@ -78,10 +78,17 @@ def validate_password(password: str):
 
 def create_user_token(user: User) -> dict:
     token = create_access_token(
-        {"sub": str(user.id), "email": user.email, "role": user.role}
+        {
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.role,
+        }
     )
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+    }
 
 
 def verify_google_credential(credential: str) -> dict:
@@ -100,47 +107,46 @@ def verify_google_credential(credential: str) -> dict:
             google_client_id,
             clock_skew_in_seconds=30,
         )
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credential",
+        )
 
 
-def send_reset_email(email: str, code: str):
-    print("========== SEND RESET EMAIL CALLED ==========")
-    print("Sending to:", email)
+def send_reset_email(email: str, code: str) -> bool:
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    email_from = os.getenv(
+        "EMAIL_FROM",
+        "PulseForm <noreply@pulseform-genpact.com>",
+    )
 
-    resend.api_key = os.getenv("RESEND_API_KEY")
-
-    if not resend.api_key:
-        print("[EMAIL ERROR] RESEND_API_KEY is not configured")
+    if not resend_api_key:
         return False
 
-    email_from = os.getenv("EMAIL_FROM", "PulseForm <onboarding@resend.dev>")
-    print("Email from:", email_from)
+    resend.api_key = resend_api_key
 
     try:
-        response = resend.Emails.send(
+        resend.Emails.send(
             {
                 "from": email_from,
                 "to": [email],
                 "subject": "PulseForm Password Reset Code",
                 "html": f"""
-                <h2>PulseForm Password Reset</h2>
-                <p>You requested a password reset for your PulseForm account.</p>
-                <p>Your reset code is:</p>
-                <h1 style="letter-spacing: 4px;">{code}</h1>
-                <p>This code will expire soon.</p>
-                <p>If you did not request this, please ignore this email.</p>
-                <br />
-                <p>PulseForm Team</p>
+                    <h2>PulseForm Password Reset</h2>
+                    <p>You requested a password reset for your PulseForm account.</p>
+                    <p>Your reset code is:</p>
+                    <h1 style="letter-spacing: 4px;">{code}</h1>
+                    <p>This code will expire soon.</p>
+                    <p>If you did not request this, please ignore this email.</p>
+                    <br />
+                    <p>PulseForm Team</p>
                 """,
             }
         )
-
-        print(f"[EMAIL SENT] Resend email sent to {email}: {response}")
         return True
 
-    except Exception as e:
-        print(f"[EMAIL ERROR] {type(e).__name__}: {e}")
+    except Exception:
         return False
 
 
@@ -227,7 +233,6 @@ def complete_google_register(
     db: Session = Depends(get_db),
 ):
     google_user = verify_google_credential(data.google_registration_token)
-
     email = google_user.get("email")
 
     if not email:
@@ -270,28 +275,15 @@ def forgot_password(
     data: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    print("========== FORGOT PASSWORD ==========")
-    print("Email:", data.email)
-
     user = db.query(User).filter(User.email == data.email).first()
-    print("User:", user)
 
     if user and user.password_hash:
-        print("Auth provider:", user.auth_provider)
-        print("Password hash exists:", bool(user.password_hash))
-
         reset_code, expires = generate_reset_code()
         user.password_reset_token = reset_code
         user.password_reset_expires = expires
         db.commit()
 
-        print("Reset code:", reset_code)
-        print("About to call send_reset_email")
-
         send_reset_email(user.email, reset_code)
-
-    else:
-        print("USER NOT FOUND OR PASSWORD HASH MISSING")
 
     return {"message": "If that email is registered, a reset code has been sent."}
 

@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr
 from google.oauth2 import id_token
 from google.auth.transport import requests
 import traceback
+import socket
 
 from app.database import get_db
 from app.models.user import User
@@ -101,6 +102,15 @@ def verify_google_credential(credential: str) -> dict:
         )
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+@router.get("/smtp-test")
+def smtp_test():
+    try:
+        socket.create_connection(("smtp.gmail.com", 465), 10)
+        return {"status": "connected"}
+    except Exception as e:
+        return {"status": "failed", "error": str(e), "type": type(e).__name__}
 
 
 def send_reset_email(email: str, code: str):

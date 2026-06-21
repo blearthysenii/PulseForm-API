@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from app.database import engine
+from fastapi import Response
 
 import os
 from dotenv import load_dotenv
@@ -53,9 +54,9 @@ app.include_router(survey_router)
 app.include_router(auth_router)
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+@app.head("/health")
+def health_head():
+    return Response(status_code=200)
 
 
 @app.get("/db-test")

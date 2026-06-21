@@ -8,9 +8,6 @@ class SurveyCreate(BaseModel):
     title: str
     description: Optional[str] = None
 
-# response of survey
-
-
 class SurveyResponse(BaseModel):
     id: int
     title: str
@@ -22,7 +19,6 @@ class SurveyResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# update of survey
 
 
 class SurveyUpdate(BaseModel):
@@ -30,7 +26,3 @@ class SurveyUpdate(BaseModel):
     description: Optional[str] = None
     is_published: Optional[bool] = None
 
-
-class SurveyCreate(BaseModel):
-    title: str
-    description: Optional[str] = None

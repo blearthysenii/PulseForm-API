@@ -21,36 +21,42 @@ from app.api.survey import router as survey_router
 from app.models.question_option import QuestionOption
 from app.models.answer import Answer
 
-
 app = FastAPI(title="PulseForm API")
 
-
-origins = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:5173"
-).split(",")
+origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://pulse-form.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 app.include_router(survey.router)
 # Create tables if they do not exist
 Base.metadata.create_all(bind=engine)
+
 
 @app.get("/")
 def root():
     return {"message": "PulseForm API is running"}
 
+
 app.include_router(survey_router)
 app.include_router(auth_router)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.get("/db-test")
 def db_test():

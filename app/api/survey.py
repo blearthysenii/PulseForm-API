@@ -54,6 +54,40 @@ def get_survey_endpoint(
     return get_survey(db=db, survey_id=survey_id, creator_id=current_user.id)
 
 
+@router.get("/{survey_id}/questions")
+def get_survey_questions_endpoint(
+    survey_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    survey = get_survey(db=db, survey_id=survey_id, creator_id=current_user.id)
+
+    questions = (
+        db.query(Question)
+        .filter(Question.survey_id == survey.id)
+        .order_by(Question.position.asc(), Question.id.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": question.id,
+            "question_text": question.text,
+            "type": question.type,
+            "is_required": question.is_required,
+            "position": question.position,
+            "options": [
+                option.text
+                for option in db.query(QuestionOption)
+                .filter(QuestionOption.question_id == question.id)
+                .order_by(QuestionOption.id.asc())
+                .all()
+            ],
+        }
+        for question in questions
+    ]
+
+
 @router.put("/{survey_id}", response_model=SurveyResponse)
 def update_survey_endpoint(
     survey_id: int,

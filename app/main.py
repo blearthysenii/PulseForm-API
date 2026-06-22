@@ -15,8 +15,10 @@ from app.models.question import Question
 from app.models.question_option import QuestionOption
 from app.models.response import Response as ResponseModel
 from app.models.answer import Answer
+from app.api.question import router as question_router
 
 load_dotenv()
+
 
 app = FastAPI(title="PulseForm API")
 
@@ -36,13 +38,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
+# Create tables if they do not exist
 Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
 def root():
     return {"message": "PulseForm API is running"}
+
+
+app.include_router(survey_router)
+app.include_router(auth_router)
+app.include_router(question_router)
 
 
 @app.get("/health")

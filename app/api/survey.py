@@ -147,6 +147,12 @@ async def import_questions_from_csv(
 
     survey = get_survey(db=db, survey_id=survey_id, creator_id=current_user.id)
 
+    if survey.is_published:
+        raise HTTPException(
+            status_code=400,
+            detail="Questions can only be changed before the survey is published"
+        )
+
     content = await file.read()
 
     try:

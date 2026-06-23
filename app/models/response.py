@@ -16,3 +16,4 @@ class Response(Base):
 
     survey = relationship("Survey", back_populates="responses")
     user = relationship("User", back_populates="responses")
+    answers = relationship("Answer", backref="response", cascade="all, delete-orphan")

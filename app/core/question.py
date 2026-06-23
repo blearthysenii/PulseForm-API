@@ -42,6 +42,14 @@ def _get_survey_or_404(db: Session, survey_id: int, creator_id: int) -> Survey:
     return survey
 
 
+def _ensure_survey_is_unpublished(survey: Survey) -> None:
+    if survey.is_published:
+        raise HTTPException(
+            status_code=400,
+            detail="Questions can only be changed before the survey is published"
+        )
+
+
 def _get_question_or_404(db: Session, question_id: int, survey_id: int) -> Question:
     question = db.query(Question).filter(
         Question.id == question_id,
@@ -55,7 +63,8 @@ def _get_question_or_404(db: Session, question_id: int, survey_id: int) -> Quest
 
 
 def create_question(db: Session, survey_id: int, data: QuestionCreate, creator_id: int) -> dict:
-    _get_survey_or_404(db, survey_id, creator_id)
+    survey = _get_survey_or_404(db, survey_id, creator_id)
+    _ensure_survey_is_unpublished(survey)
 
     if data.type not in ALLOWED_TYPES:
         raise HTTPException(
@@ -119,7 +128,8 @@ def update_question(
     data: QuestionUpdate,
     creator_id: int
 ) -> dict:
-    _get_survey_or_404(db, survey_id, creator_id)
+    survey = _get_survey_or_404(db, survey_id, creator_id)
+    _ensure_survey_is_unpublished(survey)
     question = _get_question_or_404(db, question_id, survey_id)
 
     next_type = data.type if data.type is not None else question.type
@@ -168,7 +178,8 @@ def update_question(
 
 
 def delete_question(db: Session, survey_id: int, question_id: int, creator_id: int) -> dict:
-    _get_survey_or_404(db, survey_id, creator_id)
+    survey = _get_survey_or_404(db, survey_id, creator_id)
+    _ensure_survey_is_unpublished(survey)
     question = _get_question_or_404(db, question_id, survey_id)
 
     db.delete(question)

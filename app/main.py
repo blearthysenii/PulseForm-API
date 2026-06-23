@@ -16,7 +16,7 @@ from app.models.question_option import QuestionOption
 from app.models.response import Response as ResponseModel
 from app.models.answer import Answer
 from app.api.question import router as question_router
-
+from app.api.response import router as response_router
 load_dotenv()
 
 
@@ -74,3 +74,4 @@ def db_test():
 
 app.include_router(auth_router)
 app.include_router(survey_router)
+app.include_router(response_router)

@@ -18,6 +18,8 @@ from app.models.answer import Answer
 from app.api.question import router as question_router
 from app.api.response import router as response_router
 from app.api.results import router as results_router
+from app.api.public_survey import router as public_survey_router
+from app.api.dashboard import router as dashboard_router
 load_dotenv()
 
 
@@ -51,6 +53,10 @@ def root():
 app.include_router(survey_router)
 app.include_router(auth_router)
 app.include_router(question_router)
+app.include_router(response_router)
+app.include_router(results_router)
+app.include_router(public_survey_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/health")
@@ -71,9 +77,3 @@ def db_test():
         return {"db": "connected"}
     except Exception as e:
         return {"db": "failed", "error": str(e)}
-
-
-app.include_router(auth_router)
-app.include_router(survey_router)
-app.include_router(response_router)
-app.include_router(results_router)

@@ -17,21 +17,13 @@ class Survey(Base):
     )
 
     title = Column(String(255), nullable=False)
-    description = Column(Text)
-
-    is_published = Column(Boolean, default=False)
-    allow_multiple_responses = Column(Boolean, default=False)
-
-    share_token = Column(String(255), unique=True, nullable=True, default=lambda: secrets.token_urlsafe(32))
-
-
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-    title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+
     is_published = Column(Boolean, default=False)
     allow_multiple_responses = Column(Boolean, default=False)
-    share_token = Column(String(255), unique=True, nullable=True)
+
+    share_token = Column(String(255), unique=True, nullable=True, default=lambda: secrets.token_urlsafe(16))
+
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 

@@ -1,32 +1,22 @@
-from pydantic import BaseModel, Field
-from typing import Optional
- 
- 
-class QuestionCreate(BaseModel):
-    text: str
-    type: str  # mcq | rating | text
-    is_required: Optional[bool] = False
-    position: Optional[int] = 0
-    options: Optional[list[str]] = None
- 
- 
-class QuestionUpdate(BaseModel):
-    text: Optional[str] = None
-    type: Optional[str] = None
-    is_required: Optional[bool] = None
-    position: Optional[int] = None
-    options: Optional[list[str]] = None
- 
- 
-class QuestionResponse(BaseModel):
-    id: int
-    survey_id: int
-    text: str
-    type: str
-    is_required: bool
-    position: int
-    options: list[str] = Field(default_factory=list)
- 
-    class Config:
-        from_attributes = True
- 
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
+
+from app.database import Base
+
+
+class Question(Base):
+    __tablename__ = "questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    survey_id = Column(Integer, ForeignKey("surveys.id", ondelete="CASCADE"), nullable=False)
+    text = Column(String(255), nullable=False)
+    type = Column(String(50), nullable=False)  # mcq | rating | text
+    is_required = Column(Boolean, default=False)
+    position = Column(Integer, default=0)
+
+    survey = relationship("Survey", back_populates="questions")
+    options = relationship(
+        "QuestionOption",
+        cascade="all, delete-orphan",
+        backref="question"
+    )

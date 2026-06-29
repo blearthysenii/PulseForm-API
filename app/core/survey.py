@@ -1,98 +1,77 @@
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
-import re
+import os
 import secrets
+import random
+from datetime import datetime, timedelta, timezone
 
-from app.models.survey import Survey
-from app.schemas.survey import SurveyCreate, SurveyUpdate
-
-
-def _slugify(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug[:48] or "survey"
+from dotenv import load_dotenv
+from jose import jwt, JWTError
+from passlib.context import CryptContext
 
 
-def ensure_public_slug(db: Session, survey: Survey) -> None:
-    if survey.public_slug:
-        return
+load_dotenv()
 
-    base_slug = _slugify(survey.title)
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
+PASSWORD_RESET_EXPIRE_MINUTES = int(os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", 30))
 
-    for _ in range(20):
-        candidate = f"{base_slug}-{secrets.token_hex(4)}"
-        exists = db.query(Survey).filter(Survey.public_slug == candidate).first()
-
-        if not exists:
-            survey.public_slug = candidate
-            return
-
-    raise HTTPException(status_code=500, detail="Could not generate public survey link")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def create_survey(db: Session, data: SurveyCreate, creator_id: int):
-    survey = Survey(
-        title=data.title,
-        description=data.description,
-        creator_id=creator_id
+def validate_bcrypt_password(password: str):
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password must be 72 characters or less")
+
+
+def hash_password(password: str):
+    validate_bcrypt_password(password)
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_token(token: str):
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+
+
+def generate_reset_code() -> tuple[str, datetime]:
+    code = str(random.randint(100000, 999999))
+    expires = datetime.now(timezone.utc) + timedelta(
+        minutes=PASSWORD_RESET_EXPIRE_MINUTES
     )
-    db.add(survey)
-    db.commit()
-    db.refresh(survey)
-    return survey
+    return code, expires
 
 
-def get_surveys(db: Session, creator_id: int):
-    return db.query(Survey).filter(Survey.creator_id == creator_id).all()
+def is_reset_code_valid(
+    stored_code: str | None,
+    stored_expiry: datetime | None,
+    provided_code: str
+) -> bool:
+    if not stored_code or not stored_expiry:
+        return False
 
+    expiry = (
+        stored_expiry
+        if stored_expiry.tzinfo
+        else stored_expiry.replace(tzinfo=timezone.utc)
+    )
 
-def get_survey(db: Session, survey_id: int, creator_id: int):
-    survey = db.query(Survey).filter(
-        Survey.id == survey_id,
-        Survey.creator_id == creator_id
-    ).first()
+    if datetime.now(timezone.utc) > expiry:
+        return False
 
-    if not survey:
-        raise HTTPException(status_code=404, detail="Survey not found")
-
-    return survey
-
-
-def update_survey(db: Session, survey_id: int, data: SurveyUpdate, creator_id: int):
-    survey = get_survey(db, survey_id, creator_id)
-
-    if data.title is not None:
-        survey.title = data.title
-    if data.description is not None:
-        survey.description = data.description
-    if data.is_published is not None:
-        survey.is_published = data.is_published
-        if data.is_published:
-            ensure_public_slug(db, survey)
-
-    db.commit()
-    db.refresh(survey)
-    return survey
-
-
-def delete_survey(db: Session, survey_id: int, creator_id: int):
-    survey = get_survey(db, survey_id, creator_id)
-    db.delete(survey)
-    db.commit()
-    return {"message": "Survey deleted successfully"}
-
-
-def publish_survey(db: Session, survey_id: int, creator_id: int):
-    survey = get_survey(db, survey_id, creator_id)
-    survey.is_published = True
-    ensure_public_slug(db, survey)
-    db.commit()
-    db.refresh(survey)
-    return survey
-
-
-def unpublish_survey(db: Session, survey_id: int, creator_id: int):
-    survey = get_survey(db, survey_id, creator_id)
-    survey.is_published = False
-    db.commit()
-    db.refresh(survey)
-    return survey
+    return secrets.compare_digest(stored_code, provided_code)

@@ -288,6 +288,12 @@ async def import_questions_from_csv(
 
     survey = get_survey(db=db, survey_id=survey_id, creator_id=current_user.id)
 
+    if survey.is_published:
+        raise HTTPException(
+            status_code=400,
+            detail="Questions can only be changed before the survey is published"
+        )
+
     content = await file.read()
 
     try:
@@ -306,7 +312,8 @@ async def import_questions_from_csv(
             detail="CSV must contain columns: question_text,type,is_required,options"
         )
 
-    allowed_types = {"mcq", "rating", "text"}
+    choice_types = {"mcq", "single_choice", "multiple_choice"}
+    allowed_types = {*choice_types, "rating", "text"}
     imported_count = 0
 
     for index, row in enumerate(csv_reader, start=1):
@@ -322,7 +329,7 @@ async def import_questions_from_csv(
         if question_type not in allowed_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Row {index}: type must be one of mcq, rating, text"
+                detail=f"Row {index}: type must be one of single_choice, multiple_choice, mcq, rating, text"
             )
 
         is_required = is_required_value in ["true", "1", "yes"]
@@ -338,14 +345,14 @@ async def import_questions_from_csv(
         db.add(question)
         db.flush()
 
-        if question_type == "mcq":
+        if question_type in choice_types:
             options = [option.strip()
                        for option in options_value.split("|") if option.strip()]
 
             if not options:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Row {index}: mcq questions must have options"
+                    detail=f"Row {index}: choice questions must have options"
                 )
 
             for option_text in options:

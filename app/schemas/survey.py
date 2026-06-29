@@ -14,8 +14,12 @@ class SurveyResponse(BaseModel):
     description: Optional[str]
     creator_id: int
     is_published: bool
+
     allow_multiple_responses: bool = False
     public_slug: Optional[str] = None
+
+    allow_multiple_responses: bool
+
     share_token: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

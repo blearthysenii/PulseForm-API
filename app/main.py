@@ -3,9 +3,11 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.database import Base, engine
 from app.api.auth import router as auth_router
+from app.api.public import router as public_router
 from app.api.survey import router as survey_router
 
 # Models
@@ -41,8 +43,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def ensure_database_schema():
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE surveys ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT FALSE")
+        )
+        connection.execute(
+            text("UPDATE surveys SET is_published = FALSE WHERE is_published IS NULL")
+        )
+        connection.execute(
+            text("ALTER TABLE surveys ALTER COLUMN is_published SET DEFAULT FALSE")
+        )
+        connection.execute(
+            text("ALTER TABLE surveys ALTER COLUMN is_published SET NOT NULL")
+        )
+        connection.execute(
+            text("ALTER TABLE surveys ADD COLUMN IF NOT EXISTS public_slug VARCHAR(255)")
+        )
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_surveys_public_slug "
+                "ON surveys(public_slug) WHERE public_slug IS NOT NULL"
+            )
+        )
+
+
 # Create tables if they do not exist
 Base.metadata.create_all(bind=engine)
+ensure_database_schema()
 
 
 @app.get("/")
@@ -53,6 +82,7 @@ def root():
 app.include_router(survey_router)
 app.include_router(auth_router)
 app.include_router(question_router)
+app.include_router(public_router)
 app.include_router(response_router)
 app.include_router(results_router)
 app.include_router(public_survey_router)

@@ -13,7 +13,12 @@ class AnswerSubmit(BaseModel):
 class ResponseSubmit(BaseModel):
     answers: List[AnswerSubmit]
     session_id: Optional[str] = None
- 
+
+
+class PublicResponseSubmit(BaseModel):
+    answers: List[AnswerSubmit]
+    session_id: str
+
  
 class AnswerResponse(BaseModel):
     id: int

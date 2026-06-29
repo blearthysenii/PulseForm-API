@@ -1,8 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Text, Boolean, ForeignKey, TIMESTAMP, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
-import secrets
 
 
 class Survey(Base):
@@ -17,21 +16,12 @@ class Survey(Base):
     )
 
     title = Column(String(255), nullable=False)
-    description = Column(Text)
-
-    is_published = Column(Boolean, default=False)
-    allow_multiple_responses = Column(Boolean, default=False)
-
-    share_token = Column(String(255), unique=True, nullable=True, default=lambda: secrets.token_urlsafe(32))
-
-
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-    title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    is_published = Column(Boolean, default=False)
+    is_published = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     allow_multiple_responses = Column(Boolean, default=False)
     share_token = Column(String(255), unique=True, nullable=True)
+    public_slug = Column(String(255), unique=True, nullable=True, index=True)
+
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 

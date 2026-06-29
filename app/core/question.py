@@ -2,11 +2,42 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
  
 from app.models.question import Question
+from app.models.question_option import QuestionOption
 from app.models.survey import Survey
 from app.schemas.question import QuestionCreate, QuestionUpdate
  
  
-ALLOWED_TYPES = {"mcq", "rating", "text"}
+ALLOWED_TYPES = {
+    "single_choice",
+    "multiple_choice",
+    "mcq",
+    "checkbox",
+    "dropdown",
+    "rating",
+    "linear_scale",
+    "text",
+    "short_answer",
+    "paragraph",
+    "date",
+    "time",
+    "file_upload",
+    "section",
+}
+CHOICE_TYPES = {"single_choice", "multiple_choice", "mcq", "checkbox", "dropdown"}
+
+
+def _clean_options(options: list[str] | None) -> list[str]:
+    if not options:
+        return []
+
+    return [option.strip() for option in options if option and option.strip()]
+
+
+def _replace_question_options(db: Session, question_id: int, options: list[str]) -> None:
+    db.query(QuestionOption).filter(QuestionOption.question_id == question_id).delete()
+
+    for option_text in options:
+        db.add(QuestionOption(question_id=question_id, text=option_text))
  
  
 def _get_survey_or_404(db: Session, survey_id: int, creator_id: int) -> Survey:
@@ -41,6 +72,14 @@ def create_question(db: Session, survey_id: int, data: QuestionCreate, creator_i
             status_code=422,
             detail=f"Question type must be one of: {', '.join(ALLOWED_TYPES)}"
         )
+
+    clean_options = _clean_options(data.options)
+
+    if data.type in CHOICE_TYPES and len(clean_options) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="Choice questions need at least 2 options"
+        )
  
     question = Question(
         survey_id=survey_id,
@@ -51,6 +90,11 @@ def create_question(db: Session, survey_id: int, data: QuestionCreate, creator_i
     )
  
     db.add(question)
+    db.flush()
+
+    if data.type in CHOICE_TYPES:
+        _replace_question_options(db, question.id, clean_options)
+
     db.commit()
     db.refresh(question)
     return question
@@ -87,6 +131,15 @@ def update_question(
             status_code=422,
             detail=f"Question type must be one of: {', '.join(ALLOWED_TYPES)}"
         )
+
+    next_type = data.type if data.type is not None else question.type
+    clean_options = _clean_options(data.options)
+
+    if next_type in CHOICE_TYPES and data.options is not None and len(clean_options) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="Choice questions need at least 2 options"
+        )
  
     if data.text is not None:
         question.text = data.text
@@ -96,6 +149,11 @@ def update_question(
         question.is_required = data.is_required
     if data.position is not None:
         question.position = data.position
+
+    if next_type not in CHOICE_TYPES:
+        _replace_question_options(db, question.id, [])
+    elif data.options is not None:
+        _replace_question_options(db, question.id, clean_options)
  
     db.commit()
     db.refresh(question)

@@ -50,15 +50,23 @@ def submit_response(
             )
  
     # Check multiple responses if not allowed
-    if not survey.allow_multiple_responses and user_id:
-        existing = db.query(Response).filter(
-            Response.survey_id == survey_id,
-            Response.user_id == user_id
-        ).first()
- 
+    if not survey.allow_multiple_responses:
+        existing = None
+
+        if user_id:
+            existing = db.query(Response).filter(
+                Response.survey_id == survey_id,
+                Response.user_id == user_id
+            ).first()
+        elif data.session_id:
+            existing = db.query(Response).filter(
+                Response.survey_id == survey_id,
+                Response.session_id == data.session_id
+            ).first()
+
         if existing:
             raise HTTPException(
-                status_code=400,
+                status_code=409,
                 detail="You have already submitted a response to this survey"
             )
  

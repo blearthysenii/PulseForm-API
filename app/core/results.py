@@ -44,7 +44,7 @@ def get_results(db: Session, survey_id: int, creator_id: int) -> dict:
 
         answer_count = len(answers)
 
-        if question.type == "mcq":
+        if question.type in ("mcq", "single_choice", "multiple_choice"):
             # Count by option_id, fall back to value_text
             option_counts = Counter()
             for a in answers:
@@ -59,7 +59,7 @@ def get_results(db: Session, survey_id: int, creator_id: int) -> dict:
             question_results.append({
                 "question_id": question.id,
                 "text": question.text,
-                "type": "mcq",
+                "type": question.type,
                 "answer_count": answer_count,
                 "chart_data": chart_data,
             })

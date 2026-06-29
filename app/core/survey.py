@@ -1,3 +1,5 @@
+import secrets
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.survey import Survey
@@ -57,6 +59,8 @@ def delete_survey(db: Session, survey_id: int, creator_id: int):
 def publish_survey(db: Session, survey_id: int, creator_id: int):
     survey = get_survey(db, survey_id, creator_id)
     survey.is_published = True
+    if not survey.share_token:
+        survey.share_token = secrets.token_urlsafe(16)
     db.commit()
     db.refresh(survey)
     return survey
@@ -67,4 +71,16 @@ def unpublish_survey(db: Session, survey_id: int, creator_id: int):
     survey.is_published = False
     db.commit()
     db.refresh(survey)
+    return survey
+
+
+def get_survey_by_token(db: Session, share_token: str) -> Survey:
+    survey = db.query(Survey).filter(
+        Survey.share_token == share_token,
+        Survey.is_published == True
+    ).first()
+
+    if not survey:
+        raise HTTPException(status_code=404, detail="Survey not found or not published")
+
     return survey

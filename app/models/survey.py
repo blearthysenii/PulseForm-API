@@ -23,6 +23,7 @@ class Survey(Base):
     allow_multiple_responses = Column(Boolean, default=False)
 
     share_token = Column(String(255), unique=True, nullable=True, default=lambda: secrets.token_urlsafe(16))
+    public_slug = Column(String(255), unique=True, nullable=True, index=True)
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())

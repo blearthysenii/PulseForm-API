@@ -2,24 +2,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.response import PublicResponseSubmit, ResponseResponse
+from app.schemas.response import PublicResponseSubmit, PublicResponseResult
 from app.core.survey import get_survey_by_token
 from app.core.response import submit_response
 from app.models.question import Question
 from app.models.question_option import QuestionOption
 
-router = APIRouter(prefix="/s", tags=["Public Surveys"])
+router = APIRouter(tags=["Public Surveys"])
 
 
-@router.get("/{share_token}")
-def get_public_survey_endpoint(
-    share_token: str,
-    db: Session = Depends(get_db)
-):
-    """
-    Public, unauthenticated view of a published survey, looked up by its
-    share token. Used to render the respondent-facing form.
-    """
+def _public_survey_payload(db: Session, share_token: str) -> dict:
     survey = get_survey_by_token(db, share_token)
 
     questions = (
@@ -29,46 +21,66 @@ def get_public_survey_endpoint(
         .all()
     )
 
-    return {
-        "id": survey.id,
-        "title": survey.title,
-        "description": survey.description,
-        "questions": [
+    question_payloads = []
+    for question in questions:
+        options = (
+            db.query(QuestionOption)
+            .filter(QuestionOption.question_id == question.id)
+            .order_by(QuestionOption.id.asc())
+            .all()
+        )
+
+        question_payloads.append(
             {
                 "id": question.id,
+                "text": question.text,
                 "question_text": question.text,
                 "type": question.type,
                 "is_required": question.is_required,
                 "position": question.position,
                 "options": [
-                    option.text
-                    for option in db.query(QuestionOption)
-                    .filter(QuestionOption.question_id == question.id)
-                    .order_by(QuestionOption.id.asc())
-                    .all()
+                    {"id": option.id, "text": option.text}
+                    for option in options
                 ],
             }
-            for question in questions
-        ],
+        )
+
+    return {
+        "id": survey.id,
+        "title": survey.title,
+        "description": survey.description,
+        "public_slug": survey.public_slug,
+        "questions": question_payloads,
     }
 
 
-@router.post("/{share_token}/responses", response_model=ResponseResponse)
+@router.get("/s/{share_token}")
+@router.get("/public/surveys/{share_token}")
+def get_public_survey_endpoint(
+    share_token: str,
+    db: Session = Depends(get_db),
+):
+    return _public_survey_payload(db, share_token)
+
+
+@router.post("/s/{share_token}/responses", response_model=PublicResponseResult)
+@router.post("/public/surveys/{share_token}/responses", response_model=PublicResponseResult)
 def submit_public_response_endpoint(
     share_token: str,
     data: PublicResponseSubmit,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Submit a response to a published survey via its public share link.
-    Always anonymous. A response is uniquely identified by
-    (survey, session_id) to prevent the same respondent from submitting
-    more than once, unless the survey allows multiple responses.
-    """
     survey = get_survey_by_token(db, share_token)
-    return submit_response(
+    response = submit_response(
         db=db,
         survey_id=survey.id,
         data=data,
-        user_id=None
+        user_id=None,
     )
+
+    return {
+        "id": response.id,
+        "survey_id": response.survey_id,
+        "submitted_at": response.submitted_at,
+        "answers_saved": len(response.answers),
+    }

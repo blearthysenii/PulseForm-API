@@ -7,8 +7,19 @@ from app.models.survey import Survey
 from app.schemas.question import QuestionCreate, QuestionUpdate
 
 
-CHOICE_TYPES = {"mcq", "single_choice", "multiple_choice"}
-ALLOWED_TYPES = {*CHOICE_TYPES, "rating", "text"}
+CHOICE_TYPES = {"mcq", "single_choice", "multiple_choice", "checkbox", "dropdown"}
+ALLOWED_TYPES = {
+    *CHOICE_TYPES,
+    "rating",
+    "linear_scale",
+    "text",
+    "short_answer",
+    "paragraph",
+    "date",
+    "time",
+    "file_upload",
+    "section",
+}
 
 
 def _serialize_question(question: Question) -> dict:

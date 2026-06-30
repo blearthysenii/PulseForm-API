@@ -70,11 +70,13 @@ def get_survey_questions_endpoint(
     )
 
     return [
-        {
-            "id": question.id,
-            "question_text": question.text,
-            "type": question.type,
-            "is_required": question.is_required,
+            {
+                "id": question.id,
+                "survey_id": question.survey_id,
+                "text": question.text,
+                "question_text": question.text,
+                "type": question.type,
+                "is_required": question.is_required,
             "position": question.position,
             "options": [
                 option.text
@@ -171,8 +173,19 @@ async def import_questions_from_csv(
             detail="CSV must contain columns: question_text,type,is_required,options"
         )
 
-    choice_types = {"mcq", "single_choice", "multiple_choice"}
-    allowed_types = {*choice_types, "rating", "text"}
+    choice_types = {"mcq", "single_choice", "multiple_choice", "checkbox", "dropdown"}
+    allowed_types = {
+        *choice_types,
+        "rating",
+        "linear_scale",
+        "text",
+        "short_answer",
+        "paragraph",
+        "date",
+        "time",
+        "file_upload",
+        "section",
+    }
     imported_count = 0
 
     for index, row in enumerate(csv_reader, start=1):
@@ -188,7 +201,7 @@ async def import_questions_from_csv(
         if question_type not in allowed_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Row {index}: type must be one of single_choice, multiple_choice, mcq, rating, text"
+                detail=f"Row {index}: type must be one of {', '.join(sorted(allowed_types))}"
             )
 
         is_required = is_required_value in ["true", "1", "yes"]

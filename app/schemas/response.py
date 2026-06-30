@@ -6,8 +6,11 @@ from datetime import datetime
 class AnswerSubmit(BaseModel):
     question_id: int
     value_text: Optional[str] = None
+    text_answer: Optional[str] = None
     value_number: Optional[int] = None
     option_id: Optional[int] = None
+    selected_option_id: Optional[int] = None
+    selected_option_ids: Optional[List[int]] = None
  
  
 class ResponseSubmit(BaseModel):
@@ -17,7 +20,14 @@ class ResponseSubmit(BaseModel):
 
 class PublicResponseSubmit(BaseModel):
     answers: List[AnswerSubmit]
-    session_id: str
+    session_id: Optional[str] = None
+
+
+class PublicResponseResult(BaseModel):
+    id: int
+    survey_id: int
+    submitted_at: Optional[datetime] = None
+    answers_saved: int
 
  
 class AnswerResponse(BaseModel):
